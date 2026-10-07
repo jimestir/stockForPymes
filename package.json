@@ -1,0 +1,9 @@
+{
+  "name": "stock-for-pymes",
+  "description": "Stock for PYMEs — plataforma ROPO de stock y reservas para farmacias locales",
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ]
+}
