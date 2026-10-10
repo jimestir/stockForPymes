@@ -1,0 +1,39 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Pharmacy {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  address   String
+  cp        String
+  lat       Float?
+  lng       Float?
+  phone     String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  users User[]
+
+  @@map("pharmacies")
+}
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  name         String
+  role         String   @default("CLIENT")
+  pharmacyId   String?  @map("pharmacy_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  pharmacy Pharmacy? @relation(fields: [pharmacyId], references: [id], onDelete: SetNull)
+
+  @@map("users")
+}
