@@ -2,6 +2,9 @@ import cors from 'cors';
 import express from 'express';
 import helmet from 'helmet';
 import { pharmaciesRouter } from './routes/pharmacies.js';
+import type { NextFunction, Request, Response } from 'express';
+
+
 export function createApp() {
   const app = express();
 
@@ -19,5 +22,10 @@ export function createApp() {
     res.status(404).json({ error: 'Not found' });
   });
 
+
+  app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
+  });
   return app;
 }
