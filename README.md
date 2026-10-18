@@ -57,7 +57,7 @@ stockForPymes/
 
 ## Requisitos previos
 
-- **Node.js** 20 o superior (incluye `npm`).
+- **Node.js** 20.6 o superior (incluye `npm`; se usa el flag nativo `--env-file`).
 - **Docker** y **Docker Compose** (para la base de datos en desarrollo).
 - **Git**.
 
@@ -80,7 +80,7 @@ npm install
 
 ### 3. Configurar variables de entorno
 
-Crea el archivo `.env` en la raíz y en `apps/api/` con el siguiente contenido
+Crea un único archivo `.env` en la raíz del proyecto con el siguiente contenido
 (ajusta los valores según necesites):
 
 ```dotenv
@@ -95,7 +95,12 @@ DATABASE_URL=postgresql://stock:stock_dev_password@localhost:5432/stock_for_pyme
 ```
 
 > `DATABASE_URL` debe coincidir con las credenciales y el puerto definidos para
-> PostgreSQL.
+> PostgreSQL. No subas el archivo `.env` al repositorio (ya está en `.gitignore`).
+
+Los scripts `dev` y `start` de `apps/api` cargan automáticamente ese archivo con
+el flag nativo **`--env-file`** de Node.js, de modo que `DATABASE_URL` está
+disponible para Prisma sin necesidad de exportarla a mano. Docker Compose también
+lee el `.env` de la raíz de forma automática.
 
 ### 4. Levantar la base de datos
 
@@ -117,8 +122,7 @@ npm run db:down   # detener la base de datos
 Genera el cliente de Prisma y crea las tablas en la base de datos:
 
 ```bash
-cd apps/api
-npx prisma migrate dev
+npm run db:migrate
 ```
 
 Esto ejecuta las migraciones existentes, crea el cliente `@prisma/client` y deja
@@ -177,6 +181,7 @@ En la **raíz** del monorepo:
 | `npm run db:up`  | Levanta PostgreSQL con Docker Compose      |
 | `npm run db:down`| Detiene PostgreSQL                         |
 | `npm run db:logs`| Muestra los logs de PostgreSQL             |
+| `npm run db:migrate` | Aplica las migraciones de Prisma       |
 
 En `apps/api`:
 
