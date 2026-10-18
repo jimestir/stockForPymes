@@ -10,7 +10,8 @@
     "dev:api": "npm run dev -w @stock-pymes/api",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
-    "db:logs": "docker compose logs -f postgres"
+    "db:logs": "docker compose logs -f postgres",
+    "db:migrate": "prisma migrate dev --schema apps/api/prisma/schema.prisma"
   },
   "allowScripts": {
     "@prisma/engines@6.19.3": true,
