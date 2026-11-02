@@ -5,10 +5,10 @@ import { z } from 'zod';
 import { env } from '../config/env.js';
 
 export const JwtPayloadSchema = z.object({
-  sub: z.string().uuid(),
-  email: z.string().email(),
+  sub: z.uuid(),
+  email: z.email(),
   role: z.nativeEnum(UserRole),
-  pharmacyId: z.string().uuid().nullable()
+  pharmacyId: z.uuid().nullable()
 });
 export type JwtPayload = z.infer<typeof JwtPayloadSchema>;
 

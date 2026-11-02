@@ -2,7 +2,6 @@ import { config } from 'dotenv';
 import { resolve } from 'node:path';
 import { z } from 'zod';
 
-// Only load .env files in development
 if (process.env.NODE_ENV !== 'production') {
   config({ path: resolve(import.meta.dirname, '../../../../.env') });
   config();
@@ -32,7 +31,7 @@ const parsed = envSchema.safeParse(process.env);
 if (!parsed.success) {
   console.error(
     'Invalid environment variables:',
-    parsed.error.flatten().fieldErrors
+    z.flattenError(parsed.error).fieldErrors
   );
   process.exit(1);
 }

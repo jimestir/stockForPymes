@@ -2,12 +2,12 @@ import { z } from 'zod';
 
 export const registerSchema = z
   .object({
-    email: z.string().email(),
+    email: z.email(),
     password: z.string().min(8),
     name: z.string().min(1).max(120),
     phone: z.string().min(6).max(30).optional(),
     role: z.enum(['CLIENT', 'PHARMACY']),
-    pharmacyId: z.string().uuid().optional()
+    pharmacyId: z.uuid().optional()
   })
   .superRefine((data, ctx) => {
     if (data.role === 'PHARMACY' && !data.pharmacyId) {
@@ -27,7 +27,7 @@ export const registerSchema = z
   });
 
 export const loginSchema = z.object({
-  email: z.string().email(),
+  email: z.email(),
   password: z.string().min(1)
 });
 
