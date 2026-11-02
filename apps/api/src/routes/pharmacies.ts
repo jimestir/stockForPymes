@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
+import { requireAuth, requireRole } from "../middleware/auth.js";
 import { validateBody } from "../middleware/validate.js";
 import { pharmacyCreateSchema, type PharmacyCreateInput } from "../schemas/pharmacy.js";
 
@@ -12,6 +13,8 @@ pharmaciesRouter.get("/", async (_req, res) => {
 
 pharmaciesRouter.post(
   "/",
+  requireAuth,
+  requireRole("ADMIN"),
   validateBody(pharmacyCreateSchema),
   async (req, res) => {
     const data = req.body as PharmacyCreateInput;

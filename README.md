@@ -92,6 +92,20 @@ POSTGRES_PORT=5432
 
 # Prisma / API
 DATABASE_URL=postgresql://stock:stock_dev_password@localhost:5432/stock_for_pymes?schema=public
+
+# JWT
+JWT_SECRET=cambia-esta-clave-por-una-larga-y-aleatoria
+JWT_EXPIRES_IN=8h
+
+# API
+API_PORT=3000
+API_HOST=0.0.0.0
+NODE_ENV=development
+CORS_ORIGIN=http://localhost:5173
+
+# Rate limiting (opcional, tienen defaults)
+# AUTH_RATE_LIMIT_WINDOW_MS=900000
+# AUTH_RATE_LIMIT_MAX=10
 ```
 
 > `DATABASE_URL` debe coincidir con las credenciales y el puerto definidos para
@@ -148,17 +162,71 @@ curl http://localhost:3000/api/health
 
 Base: `http://localhost:3000/api`
 
-| Método | Ruta              | Descripción                     |
-| ------ | ----------------- | ------------------------------- |
-| GET    | `/api/health`     | Estado del servicio             |
-| GET    | `/api/pharmacies` | Lista todas las farmacias       |
-| POST   | `/api/pharmacies` | Crea una farmacia               |
+| Método | Ruta                 | Descripción                                  |
+| ------ | -------------------- | -------------------------------------------- |
+| GET    | `/api/health`        | Estado del servicio                          |
+| POST   | `/api/auth/register` | Registro de usuario (`CLIENT` o `PHARMACY`)  |
+| POST   | `/api/auth/login`    | Login y emisión del JWT                      |
+| GET    | `/api/auth/me`       | Usuario autenticado (requiere `Bearer`)      |
+| GET    | `/api/pharmacies`    | Lista todas las farmacias                    |
+| POST   | `/api/pharmacies`    | Crea una farmacia (requiere rol `ADMIN`)     |
+
+### Autenticación
+
+Registro de un cliente:
+
+```bash
+curl -X POST http://localhost:3000/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "cliente@example.com",
+    "password": "secreto123",
+    "name": "Cliente Demo",
+    "role": "CLIENT"
+  }'
+```
+
+Para registrarse como `PHARMACY` hay que enviar además el `pharmacyId` de una
+farmacia existente. El rol `ADMIN` no se puede crear desde el registro.
+
+Login:
+
+```bash
+curl -X POST http://localhost:3000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{ "email": "cliente@example.com", "password": "secreto123" }'
+```
+
+Ambos devuelven `{ "token": "...", "user": { ... } }`. El token se envía en las
+rutas protegidas:
+
+```bash
+curl http://localhost:3000/api/auth/me \
+  -H "Authorization: Bearer <token>"
+```
+
+Los endpoints `/api/auth/register` y `/api/auth/login` tienen rate limiting:
+tras superar el límite responden `429` con cabeceras `RateLimit-*`.
+
+### Crear el usuario administrador
+
+```bash
+npm run db:admin
+```
+
+Crea (o promociona) un usuario `ADMIN` de forma idempotente. Por defecto:
+`admin@stockpymes.local` / `Admin1234!`. Se puede personalizar con las variables
+`ADMIN_EMAIL`, `ADMIN_PASSWORD` y `ADMIN_NAME`. **Cambia la contraseña en
+producción.**
 
 ### Ejemplo: crear una farmacia
+
+Requiere el token de un usuario `ADMIN`:
 
 ```bash
 curl -X POST http://localhost:3000/api/pharmacies \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <token-admin>" \
   -d '{
     "name": "Farmacia Central",
     "address": "Calle Mayor 1",
@@ -182,6 +250,7 @@ En la **raíz** del monorepo:
 | `npm run db:down`| Detiene PostgreSQL                         |
 | `npm run db:logs`| Muestra los logs de PostgreSQL             |
 | `npm run db:migrate` | Aplica las migraciones de Prisma       |
+| `npm run db:admin`   | Crea/promociona el usuario administrador |
 
 En `apps/api`:
 
@@ -199,8 +268,9 @@ Definido en `apps/api/prisma/schema.prisma`:
 
 - **Pharmacy**: `id`, `name`, `address`, `cp`, `lat?`, `lng?`, `phone?`,
   `createdAt`, `updatedAt`.
-- **User**: `id`, `email` (único), `passwordHash`, `name`, `role` (por defecto
-  `CLIENT`), `pharmacyId?` (relación opcional con una farmacia).
+- **User**: `id`, `email` (único), `passwordHash`, `name`,
+  `role` (`enum UserRole`: `CLIENT` | `PHARMACY` | `ADMIN`, por defecto `CLIENT`),
+  `phone?`, `pharmacyId?` (relación opcional con una farmacia).
 
 ## Licencia
 
