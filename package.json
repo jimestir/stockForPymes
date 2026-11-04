@@ -11,11 +11,15 @@
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
     "db:logs": "docker compose logs -f postgres",
-    "db:migrate": "prisma migrate dev --schema apps/api/prisma/schema.prisma"
+    "db:migrate": "prisma migrate dev --schema apps/api/prisma/schema.prisma",
+    "db:admin": "npm run db:admin -w @stock-pymes/api"
   },
   "allowScripts": {
     "@prisma/engines@6.19.3": true,
     "prisma@6.19.3": true,
     "@prisma/client@6.19.3": true
+  },
+  "devDependencies": {
+    "prisma": "^6.19.3"
   }
 }

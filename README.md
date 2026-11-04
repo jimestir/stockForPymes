@@ -12,7 +12,7 @@ El objetivo del proyecto es digitalizar el stock de pequeñas y medianas farmaci
 2. Reservar el producto online.
 3. Recogerlo y pagarlo en la propia farmacia.
 
-La API expone actualmente la gestión de **farmacias** (alta y listado) y define los modelos base de **usuarios** con roles.
+La API expone actualmente la gestión de **farmacias** (alta y listado) y la **autenticación de usuarios** con roles (`CLIENT`, `PHARMACY` y `ADMIN`).
 
 ## Stack tecnológico
 
@@ -31,6 +31,7 @@ La API expone actualmente la gestión de **farmacias** (alta y listado) y define
 
 ```text
 stockForPymes/
+
 ├── apps/
 │   ├── api/                     # Backend REST (Express + Prisma)
 │   │   ├── prisma/
@@ -40,7 +41,7 @@ stockForPymes/
 │   │       ├── app.ts           # Configuración de Express
 │   │       ├── index.ts         # Punto de entrada
 │   │       ├── lib/prisma.ts    # Cliente Prisma
-│   │       ├── middleware/      # Middlewares de validación
+│   │       ├── middleware/      # Middlewares de validación y autenticación
 │   │       ├── routes/          # Rutas HTTP
 │   │       └── schemas/         # Esquemas Zod
 │   └── web/                     # Frontend (pendiente)
@@ -86,6 +87,20 @@ POSTGRES_PORT=5432
 
 # Prisma / API
 DATABASE_URL=postgresql://stock:stock_dev_password@localhost:5432/stock_for_pymes?schema=public
+
+# JWT
+JWT_SECRET=cambia-esta-clave-por-una-larga-y-aleatoria
+JWT_EXPIRES_IN=8h
+
+# API
+API_PORT=3000
+API_HOST=0.0.0.0
+NODE_ENV=development
+CORS_ORIGIN=http://localhost:5173
+
+# Rate limiting (opcional, tienen defaults)
+# AUTH_RATE_LIMIT_WINDOW_MS=900000
+# AUTH_RATE_LIMIT_MAX=10
 ```
 
 `DATABASE_URL` debe coincidir con las credenciales y el puerto definidos para PostgreSQL.
@@ -160,16 +175,70 @@ Base de la API:
 | Método | Ruta | Descripción |
 |---|---|---|
 | GET | `/api/health` | Comprueba el estado del servicio |
+| POST | `/api/auth/register` | Registro de usuario (`CLIENT` o `PHARMACY`) |
+| POST | `/api/auth/login` | Login y emisión del JWT |
+| GET | `/api/auth/me` | Usuario autenticado (requiere `Bearer`) |
 | GET | `/api/pharmacies` | Obtiene el listado de farmacias |
-| POST | `/api/pharmacies` | Registra una nueva farmacia |
+| POST | `/api/pharmacies` | Registra una nueva farmacia (requiere rol `ADMIN`) |
+
+### Autenticación
+
+Registro de un cliente:
+
+```bash
+curl -X POST http://localhost:3000/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "cliente@example.com",
+    "password": "secreto123",
+    "name": "Cliente Demo",
+    "role": "CLIENT"
+  }'
+```
+
+Para registrarse como `PHARMACY` hay que enviar además el `pharmacyId` de una farmacia existente. El rol `ADMIN` no se puede crear desde el registro.
+
+Login:
+
+```bash
+curl -X POST http://localhost:3000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{ "email": "cliente@example.com", "password": "secreto123" }'
+```
+
+Ambos devuelven `{ "token": "...", "user": { ... } }`. El token se envía en las rutas protegidas:
+
+```bash
+curl http://localhost:3000/api/auth/me \
+  -H "Authorization: Bearer <token>"
+```
+
+Los endpoints `/api/auth/register` y `/api/auth/login` tienen rate limiting: tras superar el límite responden `429` con cabeceras `RateLimit-*`.
+
+### Crear el usuario administrador
+
+```bash
+npm run db:admin
+```
+
+Crea (o promociona) un usuario `ADMIN` de forma idempotente. Por defecto: `admin@stockpymes.local` / `Admin1234!`. Se puede personalizar con las variables `ADMIN_EMAIL`, `ADMIN_PASSWORD` y `ADMIN_NAME`. **Cambia la contraseña en producción.**
 
 ### Ejemplo: crear una farmacia
 
-Petición:
+Requiere el token de un usuario `ADMIN`:
 
-```http
-POST /api/pharmacies
-Content-Type: application/json
+```bash
+curl -X POST http://localhost:3000/api/pharmacies \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <token-admin>" \
+  -d '{
+    "name": "Farmacia Central",
+    "address": "Calle Mayor 1",
+    "cp": "28001",
+    "lat": 40.4168,
+    "lng": -3.7038,
+    "phone": "910000000"
+  }'
 ```
 
 Cuerpo JSON:
@@ -186,11 +255,13 @@ Cuerpo JSON:
 ```
 
 Campos requeridos:
+
 - `name`
 - `address`
 - `cp`
 
 Campos opcionales:
+
 - `lat`
 - `lng`
 - `phone`
@@ -207,7 +278,7 @@ Se contemplan las siguientes técnicas:
 
 Permiten comprobar el comportamiento de los endpoints a partir de sus entradas y salidas, sin necesidad de conocer su implementación interna.
 
-Se aplicarán principalmente a las operaciones de consulta y registro de farmacias, comprobando tanto las respuestas correctas como el tratamiento de datos no válidos.
+Se aplicarán principalmente a las operaciones de consulta y registro de farmacias, así como a los flujos de registro, login y acceso a rutas protegidas, comprobando tanto las respuestas correctas como el tratamiento de datos no válidos.
 
 ### Pruebas de integración
 
@@ -222,8 +293,8 @@ Se utilizarán para comprobar que las peticiones realizadas a la API producen lo
 | Unitarias | Comprobar componentes de forma aislada. | Funciones y validaciones individuales. |
 | Integración | Verificar la comunicación entre componentes. | API, Prisma y PostgreSQL. |
 | Sistema | Comprobar el funcionamiento global de la aplicación. | Endpoints y servicios disponibles. |
-| Aceptación | Verificar que el comportamiento responde a los requisitos. | Operaciones de gestión de farmacias. |
-| Seguridad | Detectar entradas no válidas y posibles vulnerabilidades. | Validación de peticiones y respuestas HTTP. |
+| Aceptación | Verificar que el comportamiento responde a los requisitos. | Operaciones de gestión de farmacias y autenticación. |
+| Seguridad | Detectar entradas no válidas y posibles vulnerabilidades. | Validación de peticiones, autenticación y respuestas HTTP. |
 
 ## Casos de prueba previstos
 
@@ -233,9 +304,14 @@ Los siguientes casos servirán como base para el banco de pruebas. Los resultado
 |---|---|---|
 | CP01 | Consultar el estado de la API. | Respuesta HTTP 200 y estado `ok`. |
 | CP02 | Consultar el listado de farmacias. | Respuesta HTTP 200 y listado en formato JSON. |
-| CP03 | Registrar una farmacia con datos válidos. | Respuesta HTTP 201 y datos de la farmacia creada. |
-| CP04 | Registrar una farmacia sin un campo obligatorio. | La petición debe ser rechazada por la validación. |
+| CP03 | Registrar una farmacia con datos válidos como `ADMIN`. | Respuesta HTTP 201 y datos de la farmacia creada. |
+| CP04 | Registrar una farmacia sin un campo obligatorio. | Respuesta HTTP 400 por error de validación. |
 | CP05 | Acceder a una ruta inexistente. | Respuesta HTTP 404. |
+| CP06 | Registrar un usuario `CLIENT` con datos válidos. | Respuesta HTTP 201 con `token` y datos del usuario. |
+| CP07 | Iniciar sesión con credenciales válidas. | Respuesta HTTP 200 con `token` y datos del usuario. |
+| CP08 | Iniciar sesión con credenciales inválidas. | Respuesta HTTP 401. |
+| CP09 | Acceder a `/api/auth/me` sin token. | Respuesta HTTP 401. |
+| CP10 | Crear una farmacia con un rol distinto de `ADMIN`. | Respuesta HTTP 403. |
 
 **Nota:** estos son casos previstos, no resultados de pruebas ya ejecutadas. Los resultados reales y las evidencias se incorporarán durante la fase de ejecución.
 
@@ -245,11 +321,12 @@ En la raíz del monorepo:
 
 | Script | Descripción |
 |---|---|
-| `npm run dev:api` | Ejecuta la API en modo desarrollo. |
+| `npm run dev:api` | Ejecuta la API en modo desarrollo (watch). |
 | `npm run db:up` | Levanta PostgreSQL con Docker Compose. |
 | `npm run db:down` | Detiene los servicios de Docker Compose. |
 | `npm run db:logs` | Muestra los registros de PostgreSQL. |
 | `npm run db:migrate` | Aplica las migraciones de Prisma. |
+| `npm run db:admin` | Crea o promociona el usuario administrador. |
 
 En `apps/api`:
 
@@ -291,12 +368,13 @@ Representa a los usuarios de la plataforma.
 | `email` | Correo electrónico único. |
 | `passwordHash` | Contraseña almacenada mediante hash. |
 | `name` | Nombre del usuario. |
-| `role` | Rol del usuario, por defecto `CLIENT`. |
+| `phone` | Teléfono (opcional). |
+| `role` | Rol del usuario: `CLIENT`, `PHARMACY` o `ADMIN`. Por defecto `CLIENT`. |
 | `pharmacyId` | Identificador de farmacia asociado (opcional). |
 | `createdAt` | Fecha de creación. |
 | `updatedAt` | Fecha de actualización. |
 
-La relación entre `User` y `Pharmacy` es opcional. Una farmacia puede estar asociada a varios usuarios.
+La relación entre `User` y `Pharmacy` es opcional: una farmacia puede estar asociada a varios usuarios y un usuario puede no tener farmacia. En el registro, solo el rol `PHARMACY` requiere `pharmacyId`; el rol `ADMIN` se crea mediante el script `db:admin`.
 
 ## Licencia
 
