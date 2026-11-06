@@ -180,6 +180,9 @@ Base de la API:
 | GET | `/api/auth/me` | Usuario autenticado (requiere `Bearer`) |
 | GET | `/api/pharmacies` | Obtiene el listado de farmacias |
 | POST | `/api/pharmacies` | Registra una nueva farmacia (requiere rol `ADMIN`) |
+| GET | `/api/products` | Catálogo de productos (filtros `q` y `categoryId`) |
+| GET | `/api/inventory` | Inventario de la farmacia autenticada (rol `PHARMACY` o `ADMIN`) |
+| PUT | `/api/inventory` | Crea o actualiza stock y precio (rol `PHARMACY`) |
 
 ### Autenticación
 
@@ -315,6 +318,14 @@ Los siguientes casos servirán como base para el banco de pruebas. Los resultado
 
 **Nota:** estos son casos previstos, no resultados de pruebas ya ejecutadas. Los resultados reales y las evidencias se incorporarán durante la fase de ejecución.
 
+### Colección de peticiones para VS Code
+
+En `docs/requests.http` hay una colección lista para la extensión **REST Client**.
+Incluye los flujos de admin, farmacia y cliente con los tokens encadenados:
+ejecuta las peticiones en orden (`login` antes de las que lo usan).
+
+Las credenciales del archivo son de **desarrollo**; no las uses en producción.
+
 ## Scripts disponibles
 
 En la raíz del monorepo:
@@ -327,6 +338,7 @@ En la raíz del monorepo:
 | `npm run db:logs` | Muestra los registros de PostgreSQL. |
 | `npm run db:migrate` | Aplica las migraciones de Prisma. |
 | `npm run db:admin` | Crea o promociona el usuario administrador. |
+| `npm run db:seed` | Carga categorías, productos, farmacias e inventario de demo. |
 
 En `apps/api`:
 
@@ -337,6 +349,7 @@ En `apps/api`:
 | `npm start` | Ejecuta la versión compilada. |
 | `npm run typecheck` | Comprueba los tipos sin generar archivos. |
 | `npm run clean` | Elimina la carpeta `dist/`. |
+| `npm run db:seed` | Carga los datos de demo. |
 
 ## Modelo de datos
 
@@ -375,6 +388,46 @@ Representa a los usuarios de la plataforma.
 | `updatedAt` | Fecha de actualización. |
 
 La relación entre `User` y `Pharmacy` es opcional: una farmacia puede estar asociada a varios usuarios y un usuario puede no tener farmacia. En el registro, solo el rol `PHARMACY` requiere `pharmacyId`; el rol `ADMIN` se crea mediante el script `db:admin`.
+
+### Category
+
+Categorías del catálogo.
+
+| Campo | Descripción |
+|---|---|
+| `id` | Identificador UUID. |
+| `name` | Nombre único de la categoría. |
+| `createdAt` | Fecha de creación. |
+
+### Product
+
+Catálogo global de productos. No guarda stock: el stock vive por farmacia.
+
+| Campo | Descripción |
+|---|---|
+| `id` | Identificador UUID. |
+| `name` | Nombre del producto. |
+| `description` | Descripción (opcional). |
+| `categoryId` | Categoría asociada (opcional). |
+| `createdAt` | Fecha de creación. |
+| `updatedAt` | Fecha de actualización. |
+
+### Inventory
+
+Stock y precio de un producto en una farmacia concreta. Es la fuente de verdad.
+
+| Campo | Descripción |
+|---|---|
+| `id` | Identificador UUID. |
+| `pharmacyId` | Farmacia a la que pertenece la fila. |
+| `productId` | Producto. |
+| `stock` | Unidades disponibles (no puede ser negativo). |
+| `price` | Precio con dos decimales (no puede ser negativo). |
+| `version` | Se incrementa en cada actualización (base del bloqueo optimista). |
+| `createdAt` | Fecha de creación. |
+| `updatedAt` | Fecha de actualización. |
+
+Restricciones: `UNIQUE (pharmacyId, productId)` y los `CHECK (stock >= 0)` / `CHECK (price >= 0)` aplicados en la migración SQL. Una farmacia solo puede modificar su propio inventario: el `pharmacyId` se toma del JWT, nunca del cuerpo de la petición.
 
 ## Licencia
 
