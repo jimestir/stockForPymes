@@ -1,6 +1,6 @@
 # Plan de sprints — Stock for PYMEs (backend-first)
 
-Mapa de trabajo para recrear el proyecto. Cada sprint define primero su parte de
+Mapa de trabajo del proyecto. Cada sprint define primero su parte de
 base de datos y después la API que la usa.
 
 ## Estado actual
@@ -47,8 +47,8 @@ con rol ADMIN.
   `UNIQUE (pharmacyId, productId)` e `Inventory.version`.
 - `CHECK (stock >= 0)` y `CHECK (price >= 0)` añadidos a mano en el SQL de la
   migración (Prisma no los genera).
-- **No se añadió `Product.ean`**: el proyecto de referencia tampoco lo incluye; el
-  frontend consume `productId`. Queda como decisión pendiente si se necesita.
+- No se añadió `Product.ean`: el frontend consume `productId`. Queda como
+  decisión pendiente si se necesita.
 
 **API:**
 - `GET /api/products` (público; filtros `q` y `categoryId`)
@@ -82,7 +82,7 @@ farmacia no ve ni escribe el inventario de otra, `stock: -1` da `400` por Zod y
 **Base de datos:** `ReservationGroup` + `Reservation` ya existen. Falta:
 - `CHECK (quantity > 0)`
 - Índices `[status, expiresAt]` (ya están)
-- **Decisión pendiente:** TTL de **30 min** (prototipo) vs **24 h** (código original). Hay que elegir uno.
+- **Decisión pendiente:** TTL de **30 min** o **24 h**. Hay que elegir uno.
 
 **API:**
 - `POST /api/reservations/groups` (carrito de una farmacia)
@@ -137,8 +137,8 @@ farmacia no ve ni escribe el inventario de otra, `stock: -1` da `400` por Zod y
 ## Decisiones que debemos cerrar antes de sus sprints
 
 1. **TTL de reservas:** 30 min o 24 h.
-2. **`Product.ean`:** el prototipo lo pide, el schema no lo tiene.
-3. **Aprobación de farmacias (PENDING/APPROVED):** aparece en el prototipo L8 pero no en el schema ni en la API.
+2. **`Product.ean`:** el frontend lo necesita, el schema no lo tiene.
+3. **Aprobación de farmacias (PENDING/APPROVED):** previsto en el diseño, pero no en el schema ni en la API.
 4. **Express 5 vs 4:** ✅ decidido — se mantiene Express 5.
 5. **CHECK constraints:** se harán en migraciones SQL manuales.
 

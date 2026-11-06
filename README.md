@@ -46,6 +46,9 @@ stockForPymes/
 │   │       └── schemas/         # Esquemas Zod
 │   └── web/                     # Frontend (pendiente)
 ├── docker-compose.yml           # PostgreSQL para desarrollo
+├── docs/
+│   ├── requests.http            # Pruebas de endpoints (REST Client)
+│   └── SPRINTS-*.md             # Plan de sprints
 ├── package.json                 # Workspaces y scripts raíz
 └── tsconfig.base.json           # Configuración TypeScript compartida
 ```
@@ -165,6 +168,12 @@ Respuesta esperada:
   "service": "api"
 }
 ```
+
+### 7. Probar los endpoints
+
+El repositorio incluye `docs/requests.http`, un archivo de pruebas de los
+endpoints. Se usa con la extensión **REST Client** de VS Code; los pasos están
+en [Prueba de endpoints con VS Code](#prueba-de-endpoints-con-vs-code).
 
 ## Endpoints de la API
 
@@ -318,13 +327,22 @@ Los siguientes casos servirán como base para el banco de pruebas. Los resultado
 
 **Nota:** estos son casos previstos, no resultados de pruebas ya ejecutadas. Los resultados reales y las evidencias se incorporarán durante la fase de ejecución.
 
-### Colección de peticiones para VS Code
+### Prueba de endpoints con VS Code
 
-En `docs/requests.http` hay una colección lista para la extensión **REST Client**.
-Incluye los flujos de admin, farmacia y cliente con los tokens encadenados:
-ejecuta las peticiones en orden (`login` antes de las que lo usan).
+El repositorio incluye `docs/requests.http`, un archivo de pruebas de los
+endpoints de la API. Se utiliza con la extensión **REST Client** de VS Code:
 
-Las credenciales del archivo son de **desarrollo**; no las uses en producción.
+1. Instala la extensión **REST Client** (Huachao Mao) desde el marketplace.
+2. Abre `docs/requests.http` en VS Code.
+3. Ejecuta las peticiones en orden con el enlace **Send Request** que aparece
+   encima de cada bloque. Empieza siempre por el `login`, porque el resto usa
+   el token que devuelve.
+
+Incluye los flujos de `ADMIN`, `PHARMACY` y `CLIENT`, con los tokens encadenados,
+las pruebas de permisos (401 y 403) y la de stock negativo (400). Sirve además
+para reproducir los casos de prueba `CP01`–`CP10` de la sección anterior.
+
+> Las credenciales del archivo son de desarrollo. No las uses en producción.
 
 ## Scripts disponibles
 
