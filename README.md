@@ -46,6 +46,9 @@ stockForPymes/
 │   │       └── schemas/         # Esquemas Zod
 │   └── web/                     # Frontend (pendiente)
 ├── docker-compose.yml           # PostgreSQL para desarrollo
+├── docs/
+│   ├── requests.http            # Pruebas de endpoints (REST Client)
+│   └── SPRINTS-*.md             # Plan de sprints
 ├── package.json                 # Workspaces y scripts raíz
 └── tsconfig.base.json           # Configuración TypeScript compartida
 ```
@@ -166,6 +169,12 @@ Respuesta esperada:
 }
 ```
 
+### 7. Probar los endpoints
+
+El repositorio incluye `docs/requests.http`, un archivo de pruebas de los
+endpoints. Se usa con la extensión **REST Client** de VS Code; los pasos están
+en [Prueba de endpoints con VS Code](#prueba-de-endpoints-con-vs-code).
+
 ## Endpoints de la API
 
 Base de la API:
@@ -180,6 +189,9 @@ Base de la API:
 | GET | `/api/auth/me` | Usuario autenticado (requiere `Bearer`) |
 | GET | `/api/pharmacies` | Obtiene el listado de farmacias |
 | POST | `/api/pharmacies` | Registra una nueva farmacia (requiere rol `ADMIN`) |
+| GET | `/api/products` | Catálogo de productos (filtros `q` y `categoryId`) |
+| GET | `/api/inventory` | Inventario de la farmacia autenticada (rol `PHARMACY` o `ADMIN`) |
+| PUT | `/api/inventory` | Crea o actualiza stock y precio (rol `PHARMACY`) |
 
 ### Autenticación
 
@@ -315,6 +327,23 @@ Los siguientes casos servirán como base para el banco de pruebas. Los resultado
 
 **Nota:** estos son casos previstos, no resultados de pruebas ya ejecutadas. Los resultados reales y las evidencias se incorporarán durante la fase de ejecución.
 
+### Prueba de endpoints con VS Code
+
+El repositorio incluye `docs/requests.http`, un archivo de pruebas de los
+endpoints de la API. Se utiliza con la extensión **REST Client** de VS Code:
+
+1. Instala la extensión **REST Client** (Huachao Mao) desde el marketplace.
+2. Abre `docs/requests.http` en VS Code.
+3. Ejecuta las peticiones en orden con el enlace **Send Request** que aparece
+   encima de cada bloque. Empieza siempre por el `login`, porque el resto usa
+   el token que devuelve.
+
+Incluye los flujos de `ADMIN`, `PHARMACY` y `CLIENT`, con los tokens encadenados,
+las pruebas de permisos (401 y 403) y la de stock negativo (400). Sirve además
+para reproducir los casos de prueba `CP01`–`CP10` de la sección anterior.
+
+> Las credenciales del archivo son de desarrollo. No las uses en producción.
+
 ## Scripts disponibles
 
 En la raíz del monorepo:
@@ -327,6 +356,7 @@ En la raíz del monorepo:
 | `npm run db:logs` | Muestra los registros de PostgreSQL. |
 | `npm run db:migrate` | Aplica las migraciones de Prisma. |
 | `npm run db:admin` | Crea o promociona el usuario administrador. |
+| `npm run db:seed` | Carga categorías, productos, farmacias e inventario de demo. |
 
 En `apps/api`:
 
@@ -337,6 +367,7 @@ En `apps/api`:
 | `npm start` | Ejecuta la versión compilada. |
 | `npm run typecheck` | Comprueba los tipos sin generar archivos. |
 | `npm run clean` | Elimina la carpeta `dist/`. |
+| `npm run db:seed` | Carga los datos de demo. |
 
 ## Modelo de datos
 
@@ -375,6 +406,46 @@ Representa a los usuarios de la plataforma.
 | `updatedAt` | Fecha de actualización. |
 
 La relación entre `User` y `Pharmacy` es opcional: una farmacia puede estar asociada a varios usuarios y un usuario puede no tener farmacia. En el registro, solo el rol `PHARMACY` requiere `pharmacyId`; el rol `ADMIN` se crea mediante el script `db:admin`.
+
+### Category
+
+Categorías del catálogo.
+
+| Campo | Descripción |
+|---|---|
+| `id` | Identificador UUID. |
+| `name` | Nombre único de la categoría. |
+| `createdAt` | Fecha de creación. |
+
+### Product
+
+Catálogo global de productos. No guarda stock: el stock vive por farmacia.
+
+| Campo | Descripción |
+|---|---|
+| `id` | Identificador UUID. |
+| `name` | Nombre del producto. |
+| `description` | Descripción (opcional). |
+| `categoryId` | Categoría asociada (opcional). |
+| `createdAt` | Fecha de creación. |
+| `updatedAt` | Fecha de actualización. |
+
+### Inventory
+
+Stock y precio de un producto en una farmacia concreta. Es la fuente de verdad.
+
+| Campo | Descripción |
+|---|---|
+| `id` | Identificador UUID. |
+| `pharmacyId` | Farmacia a la que pertenece la fila. |
+| `productId` | Producto. |
+| `stock` | Unidades disponibles (no puede ser negativo). |
+| `price` | Precio con dos decimales (no puede ser negativo). |
+| `version` | Se incrementa en cada actualización (base del bloqueo optimista). |
+| `createdAt` | Fecha de creación. |
+| `updatedAt` | Fecha de actualización. |
+
+Restricciones: `UNIQUE (pharmacyId, productId)` y los `CHECK (stock >= 0)` / `CHECK (price >= 0)` aplicados en la migración SQL. Una farmacia solo puede modificar su propio inventario: el `pharmacyId` se toma del JWT, nunca del cuerpo de la petición.
 
 ## Licencia
 

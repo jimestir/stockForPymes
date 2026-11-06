@@ -1,6 +1,6 @@
 # Plan de sprints — Stock for PYMEs (backend-first)
 
-Mapa de trabajo para recrear el proyecto. Cada sprint define primero su parte de
+Mapa de trabajo del proyecto. Cada sprint define primero su parte de
 base de datos y después la API que la usa.
 
 ## Estado actual
@@ -8,6 +8,7 @@ base de datos y después la API que la usa.
 - **Sprint 0 — Fundaciones** ✅ (monorepo, Express, health, Docker/PostgreSQL, Prisma, config)
 - **Sprint 1 — Modelo de datos** ✅ (schema completo, migración `init`, cliente)
 - **Sprint 2 — Autenticación** ✅ (rama `feature/auth-jwt`, pendiente de merge)
+- **Sprint 3 — Catálogo e inventario** ✅ (rama `feat/inventory-and-catalog`)
 
 ---
 
@@ -37,19 +38,30 @@ con rol ADMIN.
 
 ---
 
-## Sprint 3 — Catálogo e inventario
+## Sprint 3 — Catálogo e inventario ✅
 
-**Base de datos:** `Category`, `Product` ya existen. Falta:
-- `Product.ean` (el prototipo lo usa en L6/L7 y no está en el schema) → migración nueva.
-- `CHECK (stock >= 0)` y `CHECK (price >= 0)` → migración SQL manual (Prisma no los soporta).
-- Seed inicial (categorías, productos, farmacias demo).
+**Base de datos:** modelos nuevos (migración `20261104204039_catalog_inventory`):
+- `Category` (`name` único) y `Product` (`categoryId?` opcional, índices en `name` y
+  `categoryId`).
+- `Inventory`: stock y precio por farmacia+producto, con
+  `UNIQUE (pharmacyId, productId)` e `Inventory.version`.
+- `CHECK (stock >= 0)` y `CHECK (price >= 0)` añadidos a mano en el SQL de la
+  migración (Prisma no los genera).
+- No se añadió `Product.ean`: el frontend consume `productId`. Queda como
+  decisión pendiente si se necesita.
 
 **API:**
-- `GET /api/products` (filtro `q`, `categoryId`)
-- `GET /api/inventory` y `PUT /api/inventory` (upsert stock/precio) — solo rol PHARMACY sobre **su** farmacia
-- Uso de `Inventory.version` para *optimistic locking*
+- `GET /api/products` (público; filtros `q` y `categoryId`)
+- `GET /api/inventory` y `PUT /api/inventory`:
+  - `GET`: rol `PHARMACY` (su propia farmacia) o `ADMIN` (`?pharmacyId=`).
+  - `PUT`: solo `PHARMACY`; el `pharmacyId` sale del JWT, nunca del body.
+  - `upsert` por `(pharmacyId, productId)`; `version` se incrementa en cada update.
+- Seed idempotente: `npm run db:seed` (categorías, productos, farmacias e inventario
+  de demo).
 
-**Criterio de hecho:** una farmacia no puede tocar el inventario de otra; no se puede dejar stock negativo.
+**Criterio de hecho:** ✅ verificado — sin token `401`, rol `CLIENT` `403`, una
+farmacia no ve ni escribe el inventario de otra, `stock: -1` da `400` por Zod y
+`23514` (CHECK) si se intenta saltar la API.
 
 ---
 
@@ -70,7 +82,7 @@ con rol ADMIN.
 **Base de datos:** `ReservationGroup` + `Reservation` ya existen. Falta:
 - `CHECK (quantity > 0)`
 - Índices `[status, expiresAt]` (ya están)
-- **Decisión pendiente:** TTL de **30 min** (prototipo) vs **24 h** (código original). Hay que elegir uno.
+- **Decisión pendiente:** TTL de **30 min** o **24 h**. Hay que elegir uno.
 
 **API:**
 - `POST /api/reservations/groups` (carrito de una farmacia)
@@ -125,8 +137,8 @@ con rol ADMIN.
 ## Decisiones que debemos cerrar antes de sus sprints
 
 1. **TTL de reservas:** 30 min o 24 h.
-2. **`Product.ean`:** el prototipo lo pide, el schema no lo tiene.
-3. **Aprobación de farmacias (PENDING/APPROVED):** aparece en el prototipo L8 pero no en el schema ni en la API.
+2. **`Product.ean`:** el frontend lo necesita, el schema no lo tiene.
+3. **Aprobación de farmacias (PENDING/APPROVED):** previsto en el diseño, pero no en el schema ni en la API.
 4. **Express 5 vs 4:** ✅ decidido — se mantiene Express 5.
 5. **CHECK constraints:** se harán en migraciones SQL manuales.
 

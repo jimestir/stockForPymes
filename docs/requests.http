@@ -1,0 +1,113 @@
+@baseUrl = http://localhost:3000/api
+@adminEmail = admin@stockpymes.local
+@adminPassword = Admin1234!
+@pharmacyEmail = farmacia.demo@example.com
+@pharmacyPassword = secreto123
+@clientEmail = cliente.demo@example.com
+@clientPassword = secreto123
+
+### 0. Health (público)
+GET {{baseUrl}}/health
+
+### 1. Login ADMIN  ← ejecutar primero
+# @name loginAdmin
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{adminEmail}}",
+  "password": "{{adminPassword}}"
+}
+
+### 2. Usuario del token (401 si no hay token)
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{loginAdmin.response.body.token}}
+
+### 3. Crear farmacia (solo ADMIN)
+# @name crearFarmacia
+POST {{baseUrl}}/pharmacies
+Authorization: Bearer {{loginAdmin.response.body.token}}
+Content-Type: application/json
+
+{
+  "name": "Farmacia Demo HTTP",
+  "address": "Calle Mayor 1",
+  "cp": "28001"
+}
+
+### 4. Registrar usuario PHARMACY vinculado a la farmacia anterior
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "{{pharmacyEmail}}",
+  "password": "{{pharmacyPassword}}",
+  "name": "Farmacéutico Demo",
+  "role": "PHARMACY",
+  "pharmacyId": "{{crearFarmacia.response.body.id}}"
+}
+
+### 5. Login PHARMACY
+# @name loginPharmacy
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{pharmacyEmail}}",
+  "password": "{{pharmacyPassword}}"
+}
+
+### 6. Catálogo (público). El nombre 'productos' se usa en el paso 8
+# @name productos
+GET {{baseUrl}}/products?q=Paracetamol
+
+### 7. Inventario de la farmacia (200)
+GET {{baseUrl}}/inventory
+Authorization: Bearer {{loginPharmacy.response.body.token}}
+
+### 8. Crear/actualizar stock (200; repetir y ver que 'version' sube)
+PUT {{baseUrl}}/inventory
+Authorization: Bearer {{loginPharmacy.response.body.token}}
+Content-Type: application/json
+
+{
+  "productId": "{{productos.response.body.$[0].id}}",
+  "stock": 10,
+  "price": 5.25
+}
+
+### 9. Stock negativo (esperado 400)
+PUT {{baseUrl}}/inventory
+Authorization: Bearer {{loginPharmacy.response.body.token}}
+Content-Type: application/json
+
+{
+  "productId": "{{productos.response.body.$[0].id}}",
+  "stock": -1,
+  "price": 5
+}
+
+### 10. Registro y login CLIENT (para probar 403)
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "{{clientEmail}}",
+  "password": "{{clientPassword}}",
+  "name": "Cliente Demo",
+  "role": "CLIENT"
+}
+
+### 11. Login CLIENT
+# @name loginClient
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{clientEmail}}",
+  "password": "{{clientPassword}}"
+}
+
+### 12. Inventario con CLIENT (esperado 403)
+GET {{baseUrl}}/inventory
+Authorization: Bearer {{loginClient.response.body.token}}
