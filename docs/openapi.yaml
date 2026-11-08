@@ -1,0 +1,100 @@
+openapi: 3.0.3
+info:
+  title: Stock for PYMEs API
+  version: 0.1.0
+paths:
+  /api/search:
+    get:
+      tags: [Search]
+      summary: Comparador de precios y stock
+      description: >-
+        Devuelve una fila por producto y farmacia. Incluye inventario con stock
+        cero para reproducir el comportamiento del proyecto guía.
+      operationId: searchCompare
+      parameters:
+        - name: q
+          in: query
+          description: Nombre de producto; la coincidencia no distingue mayúsculas.
+          schema:
+            type: string
+        - name: cp
+          in: query
+          description: Código postal de la farmacia.
+          schema:
+            type: string
+        - name: pharmacyId
+          in: query
+          description: Identificador de farmacia.
+          schema:
+            type: string
+            format: uuid
+        - name: categoryId
+          in: query
+          description: Identificador de categoría.
+          schema:
+            type: string
+            format: uuid
+        - name: sort
+          in: query
+          description: >-
+            Orden por precio. El valor por defecto es price_asc; los valores
+            distintos de price_desc también se tratan como price_asc.
+          schema:
+            type: string
+            enum: [price_asc, price_desc]
+            default: price_asc
+      responses:
+        '200':
+          description: Filas comparativas por farmacia.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SearchResultRow'
+        '400':
+          description: pharmacyId o categoryId no contiene un UUID válido.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Error inesperado al consultar el repositorio.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    SearchResultRow:
+      type: object
+      required: [productId, productName, pharmacyId, pharmacyName, cp, stock, price, lat, lng]
+      properties:
+        productId:
+          type: string
+          format: uuid
+        productName:
+          type: string
+        pharmacyId:
+          type: string
+          format: uuid
+        pharmacyName:
+          type: string
+        cp:
+          type: string
+        stock:
+          type: integer
+        price:
+          type: number
+        lat:
+          type: number
+          nullable: true
+        lng:
+          type: number
+          nullable: true
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
