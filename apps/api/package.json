@@ -8,6 +8,8 @@
     "typecheck": "tsc --noEmit",
     "build": "tsc -p tsconfig.json",
     "start": "node --env-file=../../.env dist/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "db:admin": "tsx prisma/seed-admin.ts",
     "postinstall": "prisma skills sync || exit 0"
   },
@@ -31,8 +33,11 @@
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^26.6.5",
+    "@types/supertest": "^7.2.1",
     "prisma": "^6.19.3",
+    "supertest": "^7.2.2",
     "tsx": "^4.23.15",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
   }
 }
