@@ -13,6 +13,23 @@ enum UserRole {
   ADMIN
 }
 
+enum ReservationStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  EXPIRED
+  PICKED_UP
+  NOT_PICKED_UP
+}
+
+enum ReservationGroupStatus {
+  CONFIRMED
+  PARTIALLY_PICKED_UP
+  PICKED_UP
+  CANCELLED
+  EXPIRED
+}
+
 model Pharmacy {
   id        String   @id @default(uuid()) @db.Uuid
   name      String
@@ -26,6 +43,8 @@ model Pharmacy {
 
   users     User[]
   inventory Inventory[]
+  reservations      Reservation[]
+  reservationGroups ReservationGroup[]
 
   @@index([cp])
   @@map("pharmacies")
@@ -51,6 +70,7 @@ model Product {
 
   category  Category?   @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   inventory Inventory[]
+  reservations Reservation[]
 
   @@index([name])
   @@index([categoryId])
@@ -90,6 +110,51 @@ model User {
   updatedAt    DateTime @updatedAt @map("updated_at")
 
   pharmacy Pharmacy? @relation(fields: [pharmacyId], references: [id], onDelete: SetNull)
+  reservations      Reservation[]
+  reservationGroups ReservationGroup[]
 
   @@map("users")
+}
+
+model ReservationGroup {
+  id         String                 @id @default(uuid()) @db.Uuid
+  userId     String                 @map("user_id") @db.Uuid
+  pharmacyId String                 @map("pharmacy_id") @db.Uuid
+  status     ReservationGroupStatus @default(CONFIRMED)
+  expiresAt  DateTime               @map("expires_at")
+  createdAt  DateTime               @default(now()) @map("created_at")
+  updatedAt  DateTime               @updatedAt @map("updated_at")
+
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pharmacy Pharmacy      @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  items    Reservation[]
+
+  @@index([userId])
+  @@index([pharmacyId, status])
+  @@index([status, expiresAt])
+  @@map("reservation_groups")
+}
+
+model Reservation {
+  id         String            @id @default(uuid()) @db.Uuid
+  groupId    String            @map("group_id") @db.Uuid
+  userId     String            @map("user_id") @db.Uuid
+  pharmacyId String            @map("pharmacy_id") @db.Uuid
+  productId  String            @map("product_id") @db.Uuid
+  quantity   Int               @default(1)
+  status     ReservationStatus @default(CONFIRMED)
+  expiresAt  DateTime          @map("expires_at")
+  createdAt  DateTime          @default(now()) @map("created_at")
+  updatedAt  DateTime          @updatedAt @map("updated_at")
+
+  group    ReservationGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pharmacy Pharmacy         @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  product  Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([groupId])
+  @@index([userId])
+  @@index([pharmacyId, status])
+  @@index([status, expiresAt])
+  @@map("reservations")
 }

@@ -10,6 +10,7 @@ base de datos y después la API que la usa.
 - **Sprint 2 — Autenticación** ✅ (integrado en `develop`)
 - **Sprint 3 — Catálogo e inventario** ✅ (integrado en `develop`)
 - **Sprint 4 — Buscador / comparador** ✅ (rama `feature/searchandpurchase`)
+- **Sprint 5 — Reservas y concurrencia** ✅ (rama `feat/reservations`)
 
 ---
 
@@ -95,23 +96,33 @@ texto (`pg_trgm`).
 
 ---
 
-## Sprint 5 — Reservas y concurrencia (el núcleo ROPO)
+## Sprint 5 — Reservas y concurrencia (el núcleo ROPO) ✅
 
-**Base de datos:** `ReservationGroup` + `Reservation` ya existen. Falta:
-- `CHECK (quantity > 0)`
-- Índices `[status, expiresAt]` (ya están)
-- **Decisión pendiente:** TTL de **30 min** o **24 h**. Hay que elegir uno.
+**Base de datos:** modelos `ReservationGroup` y `Reservation` (migración
+`20261106204507_reservations`):
+- Enums `ReservationStatus` (`PENDING`, `CONFIRMED`, `CANCELLED`, `EXPIRED`,
+  `PICKED_UP`, `NOT_PICKED_UP`) y `ReservationGroupStatus` (`CONFIRMED`,
+  `PARTIALLY_PICKED_UP`, `PICKED_UP`, `CANCELLED`, `EXPIRED`).
+- `CHECK (quantity > 0)` en `reservations` (añadido en la migración).
+- Índices `(pharmacyId, status)` y `(status, expiresAt)` en ambas tablas.
 
 **API:**
-- `POST /api/reservations/groups` (carrito de una farmacia)
-- `GET /api/reservations/groups`
-- `POST /api/reservations/groups/:id/pickup` (total/parcial, restaura stock de los no recogidos)
-- `POST /api/reservations/groups/:id/cancel`
-- Job de expiración (cada 60 s) que marca `EXPIRED` y devuelve stock
+- `POST /api/reservations/groups` (carrito de una farmacia, rol `CLIENT`)
+- `GET /api/reservations/groups` (cliente: las suyas; farmacia: las de su
+  farmacia; admin: todas)
+- `POST /api/reservations/groups/:id/pickup` (total o parcial; restaura el stock
+  de las líneas no recogidas; rol `PHARMACY` o `ADMIN`)
+- `POST /api/reservations/groups/:id/cancel` (cancela líneas o el grupo completo)
+- Job de expiración cada 60 s que marca `EXPIRED` y devuelve stock.
+- TTL de reserva: **30 minutos**.
 
-**Concurrencia (clave):** transacción + `SELECT … FOR UPDATE` sobre `inventory`, validar stock, descontar, insertar reserva, `COMMIT`.
+**Concurrencia (clave):** transacción + `SELECT … FOR UPDATE` sobre `inventory`,
+validar stock, descontar, insertar reserva y `COMMIT`. Las líneas se bloquean en
+orden estable por `productId` para evitar deadlocks.
 
-**Criterio de hecho:** dos reservas simultáneas no dejan stock negativo; cancelar/expirar restaura stock.
+**Criterio de hecho:** ✅ verificado — dos reservas simultáneas de la última
+unidad devuelven `201` y `409`, el stock nunca queda negativo, y cancelar o
+expirar restaura el stock.
 
 ---
 
@@ -154,7 +165,7 @@ texto (`pg_trgm`).
 
 ## Decisiones que debemos cerrar antes de sus sprints
 
-1. **TTL de reservas:** 30 min o 24 h.
+1. **TTL de reservas:** ✅ decidido — 30 minutos.
 2. **`Product.ean`:** el frontend lo necesita, el schema no lo tiene.
 3. **Aprobación de farmacias (PENDING/APPROVED):** previsto en el diseño, pero no en el schema ni en la API.
 4. **Express 5 vs 4:** ✅ decidido — se mantiene Express 5.
@@ -162,7 +173,7 @@ texto (`pg_trgm`).
 
 ## Recomendación inmediata
 
-**Sprints 2, 3 y 4 cerrados** ✅. Tras el merge de `feature/searchandpurchase` a
-`develop`, empezar el **Sprint 5 — Reservas y concurrencia**. Antes de
-implementarlo, cerrar las decisiones pendientes (TTL de reservas, `Product.ean`
-y aprobación de farmacias).
+**Sprints 2, 3, 4 y 5 cerrados** ✅. Tras el merge de `feat/reservations` a
+`develop`, empezar el **Sprint 6 — Eventos en vivo (SSE)**. Antes de
+implementarlo, cerrar las decisiones pendientes (`Product.ean` y aprobación de
+farmacias).
