@@ -5,6 +5,7 @@ import { authRouter } from './routes/auth.js';
 import { inventoryRouter } from './routes/inventory.js';
 import { pharmaciesRouter } from './routes/pharmacies.js';
 import { productsRouter } from './routes/products.js';
+import { reservationsRouter } from './routes/reservations.js';
 import { createSearchRouter } from './routes/search.js';
 import { prismaSearchRepository } from './search/prisma-search-repository.js';
 import type { SearchRepository } from './search/types.js';
@@ -37,6 +38,7 @@ export function createApp(dependencies: AppDependencies = {}) {
   app.use('/api/products', productsRouter);
   app.use('/api/inventory', inventoryRouter);
   app.use('/api/auth', authRouter);
+  app.use('/api/reservations', reservationsRouter);
   app.use(
     '/api/search',
     createSearchRouter(dependencies.searchRepository ?? prismaSearchRepository)

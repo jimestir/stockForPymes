@@ -31,6 +31,8 @@ tags:
     description: Stock y precio por farmacia
   - name: Search
     description: Buscador y comparador de precios
+  - name: Reservations
+    description: Reservas de stock y recogida en farmacia
 paths:
   /api/health:
     get:
@@ -421,6 +423,236 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /api/reservations/groups:
+    get:
+      tags: [Reservations]
+      summary: Lista los grupos de reserva
+      description: >-
+        CLIENT ve sus propios grupos; PHARMACY ve los de su farmacia; ADMIN ve
+        todos.
+      operationId: listReservationGroups
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Grupos de reserva.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ReservationGroup'
+        '401':
+          description: Token ausente, inválido o expirado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Cuenta de farmacia sin farmacia vinculada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Error inesperado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      tags: [Reservations]
+      summary: Crea un grupo de reserva para una farmacia
+      description: >-
+        Solo rol CLIENT. Descuenta stock dentro de una transacción con bloqueo
+        FOR UPDATE. Los productos duplicados se agrupan en una sola línea.
+      operationId: createReservationGroup
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReservationGroupCreateRequest'
+      responses:
+        '201':
+          description: Grupo de reserva creado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReservationGroup'
+        '400':
+          description: Datos inválidos o farmacia/producto inexistente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadRequest'
+        '401':
+          description: Token ausente, inválido o expirado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: El usuario no tiene rol CLIENT.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: No hay inventario para la farmacia y producto indicados.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Stock insuficiente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Error inesperado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/reservations/groups/{id}/pickup:
+    post:
+      tags: [Reservations]
+      summary: Recogida total o parcial de una reserva
+      description: >-
+        Rol PHARMACY (solo su farmacia) o ADMIN. Con all=true se recogen todas
+        las líneas activas. Con itemIds se recogen las indicadas y el resto se
+        marca NOT_PICKED_UP, devolviendo su stock.
+      operationId: pickupReservationGroup
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Identificador del grupo de reserva.
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReservationSelectionRequest'
+      responses:
+        '200':
+          description: Grupo actualizado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReservationGroup'
+        '400':
+          description: Datos inválidos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadRequest'
+        '401':
+          description: Token ausente, inválido o expirado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: El usuario no puede operar sobre esa farmacia.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Grupo de reserva no encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: No hay líneas activas o alguna línea no es válida.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Error inesperado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/reservations/groups/{id}/cancel:
+    post:
+      tags: [Reservations]
+      summary: Cancela total o parcialmente una reserva
+      description: >-
+        Puede cancelar el dueño, la farmacia del grupo o un ADMIN. Restaura el
+        stock de las líneas canceladas.
+      operationId: cancelReservationGroup
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Identificador del grupo de reserva.
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReservationSelectionRequest'
+      responses:
+        '200':
+          description: Grupo actualizado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReservationGroup'
+        '400':
+          description: Datos inválidos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadRequest'
+        '401':
+          description: Token ausente, inválido o expirado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: El usuario no es dueño, farmacia del grupo ni ADMIN.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Grupo de reserva no encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: No hay líneas activas o alguna línea no es válida.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Error inesperado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 components:
   securitySchemes:
     bearerAuth:
@@ -656,3 +888,132 @@ components:
         lng:
           type: number
           nullable: true
+    ReservationStatus:
+      type: string
+      enum: [PENDING, CONFIRMED, CANCELLED, EXPIRED, PICKED_UP, NOT_PICKED_UP]
+    ReservationGroupStatus:
+      type: string
+      enum: [CONFIRMED, PARTIALLY_PICKED_UP, PICKED_UP, CANCELLED, EXPIRED]
+    ReservationItem:
+      type: object
+      required:
+        [id, groupId, userId, pharmacyId, productId, quantity, status, expiresAt, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        groupId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        pharmacyId:
+          type: string
+          format: uuid
+        productId:
+          type: string
+          format: uuid
+        productName:
+          type: string
+          nullable: true
+        pharmacyName:
+          type: string
+          nullable: true
+        clientName:
+          type: string
+          nullable: true
+        clientEmail:
+          type: string
+          format: email
+          nullable: true
+        clientPhone:
+          type: string
+          nullable: true
+        quantity:
+          type: integer
+          minimum: 1
+        status:
+          $ref: '#/components/schemas/ReservationStatus'
+        expiresAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+    ReservationGroupCreateRequest:
+      type: object
+      required: [pharmacyId, items]
+      properties:
+        pharmacyId:
+          type: string
+          format: uuid
+        items:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items:
+            type: object
+            required: [productId, quantity]
+            properties:
+              productId:
+                type: string
+                format: uuid
+              quantity:
+                type: integer
+                minimum: 1
+    ReservationSelectionRequest:
+      type: object
+      description: Debe indicarse all=true o al menos un itemId.
+      properties:
+        all:
+          type: boolean
+          description: Recoge o cancela todas las líneas activas.
+        itemIds:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            format: uuid
+    ReservationGroup:
+      type: object
+      required:
+        [id, userId, pharmacyId, status, expiresAt, createdAt, itemCount, items]
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        pharmacyId:
+          type: string
+          format: uuid
+        pharmacyName:
+          type: string
+          nullable: true
+        clientName:
+          type: string
+          nullable: true
+        clientEmail:
+          type: string
+          format: email
+          nullable: true
+        clientPhone:
+          type: string
+          nullable: true
+        status:
+          $ref: '#/components/schemas/ReservationGroupStatus'
+        expiresAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        itemCount:
+          type: integer
+          minimum: 0
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReservationItem'

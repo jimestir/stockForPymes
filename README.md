@@ -193,6 +193,10 @@ Base de la API:
 | GET | `/api/inventory` | Inventario de la farmacia autenticada (rol `PHARMACY` o `ADMIN`) |
 | PUT | `/api/inventory` | Crea o actualiza stock y precio (rol `PHARMACY`) |
 | GET | `/api/search` | Buscador comparador de precios y stock (filtros `q`, `cp`, `pharmacyId`, `categoryId`, `sort`, `limit`, `offset`) |
+| POST | `/api/reservations/groups` | Crea una reserva para una farmacia (rol `CLIENT`) |
+| GET | `/api/reservations/groups` | Lista reservas del cliente, farmacia o admin |
+| POST | `/api/reservations/groups/:id/pickup` | Recogida total o parcial (rol `PHARMACY` o `ADMIN`) |
+| POST | `/api/reservations/groups/:id/cancel` | Cancela líneas o el grupo completo y restaura stock |
 
 ### Autenticación
 
@@ -324,6 +328,56 @@ Respuesta:
 
 Los productos con stock cero también aparecen en el comparador, para que el
 cliente vea que esa farmacia no tiene disponibilidad.
+
+### Reservas
+
+Las reservas agrupan los productos de una sola farmacia. Cada grupo caduca a los
+**30 minutos**; al expirar, el stock reservado se devuelve automáticamente.
+
+Crear una reserva (rol `CLIENT`):
+
+```bash
+curl -X POST http://localhost:3000/api/reservations/groups \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <token-cliente>" \
+  -d '{
+    "pharmacyId": "11111111-1111-4111-8111-111111111111",
+    "items": [
+      { "productId": "22222222-2222-4222-8222-222222222222", "quantity": 2 }
+    ]
+  }'
+```
+
+La API descuenta el stock dentro de una transacción con bloqueo `FOR UPDATE`, de
+modo que dos reservas simultáneas no pueden dejar stock negativo. Si no hay
+stock suficiente responde `409`.
+
+Recogida total o parcial (rol `PHARMACY` o `ADMIN`):
+
+```bash
+# Todas las líneas activas
+curl -X POST http://localhost:3000/api/reservations/groups/<id>/pickup \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <token-farmacia>" \
+  -d '{ "all": true }'
+
+# Solo algunas líneas; el resto se marca como no recogido y devuelve su stock
+curl -X POST http://localhost:3000/api/reservations/groups/<id>/pickup \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <token-farmacia>" \
+  -d '{ "itemIds": ["<item-id>"] }'
+```
+
+Cancelar:
+
+```bash
+curl -X POST http://localhost:3000/api/reservations/groups/<id>/cancel \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <token>" \
+  -d '{ "all": true }'
+```
+
+También se puede cancelar por líneas con `{ "itemIds": ["<item-id>"] }`.
 
 ## Estrategia de pruebas
 
