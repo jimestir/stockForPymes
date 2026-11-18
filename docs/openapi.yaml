@@ -2,14 +2,354 @@ openapi: 3.0.3
 info:
   title: Stock for PYMEs API
   version: 0.1.0
+  description: >-
+    API REST de la plataforma ROPO (Research Online, Purchase Offline) de stock
+    y reservas para farmacias locales. Construida con Express, Prisma y
+    PostgreSQL.
+  license:
+    name: GPL-3.0
+    url: https://www.gnu.org/licenses/gpl-3.0.html
+servers:
+  - url: 'http://{host}:{port}'
+    description: Entorno de desarrollo local
+    variables:
+      host:
+        default: localhost
+      port:
+        default: '3000'
+security: []
+tags:
+  - name: Health
+    description: Estado del servicio
+  - name: Auth
+    description: Registro, login y usuario autenticado
+  - name: Pharmacies
+    description: Gestión de farmacias
+  - name: Products
+    description: Catálogo global de productos
+  - name: Inventory
+    description: Stock y precio por farmacia
+  - name: Search
+    description: Buscador y comparador de precios
 paths:
+  /api/health:
+    get:
+      tags: [Health]
+      summary: Comprueba el estado de la API
+      operationId: getHealth
+      responses:
+        '200':
+          description: Servicio operativo.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+  /api/auth/register:
+    post:
+      tags: [Auth]
+      summary: Registra un usuario CLIENT o PHARMACY
+      description: >-
+        El rol ADMIN no es autoregistrable. Cuando el rol es PHARMACY,
+        pharmacyId es obligatorio y debe corresponder a una farmacia existente.
+      operationId: register
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Usuario creado y token emitido.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Datos inválidos o farmacia inexistente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadRequest'
+        '409':
+          description: El email ya está registrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Demasiados registros desde la misma IP.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/auth/login:
+    post:
+      tags: [Auth]
+      summary: Inicia sesión y emite un JWT
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Credenciales válidas y token emitido.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Datos inválidos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadRequest'
+        '401':
+          description: Credenciales inválidas.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Demasiados intentos de login desde la misma IP.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/auth/me:
+    get:
+      tags: [Auth]
+      summary: Devuelve el usuario autenticado
+      operationId: getMe
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Usuario asociado al token.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [user]
+                properties:
+                  user:
+                    $ref: '#/components/schemas/PublicUser'
+        '401':
+          description: Token ausente, inválido o expirado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/pharmacies:
+    get:
+      tags: [Pharmacies]
+      summary: Lista las farmacias
+      operationId: listPharmacies
+      responses:
+        '200':
+          description: Farmacias ordenadas por nombre.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Pharmacy'
+        '500':
+          description: Error inesperado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      tags: [Pharmacies]
+      summary: Crea una farmacia
+      description: Requiere rol ADMIN.
+      operationId: createPharmacy
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PharmacyCreateRequest'
+      responses:
+        '201':
+          description: Farmacia creada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pharmacy'
+        '400':
+          description: Datos inválidos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadRequest'
+        '401':
+          description: Token ausente, inválido o expirado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: El usuario no tiene rol ADMIN.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Error inesperado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/products:
+    get:
+      tags: [Products]
+      summary: Lista y filtra el catálogo de productos
+      operationId: listProducts
+      parameters:
+        - name: q
+          in: query
+          description: Texto a buscar en el nombre; no distingue mayúsculas.
+          schema:
+            type: string
+        - name: categoryId
+          in: query
+          description: Identificador de categoría.
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Productos ordenados por nombre.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Product'
+        '400':
+          description: categoryId no contiene un UUID válido.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Error inesperado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/inventory:
+    get:
+      tags: [Inventory]
+      summary: Lista el inventario de una farmacia
+      description: >-
+        Un usuario PHARMACY solo puede consultar su propia farmacia. Un usuario
+        ADMIN debe indicar pharmacyId mediante query param.
+      operationId: listInventory
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: pharmacyId
+          in: query
+          description: Farmacia a consultar (obligatorio para ADMIN).
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Filas de inventario de la farmacia.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/InventoryItem'
+        '400':
+          description: pharmacyId inválido o ausente para ADMIN.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Token ausente, inválido o expirado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Rol no permitido o cuenta sin farmacia vinculada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Error inesperado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    put:
+      tags: [Inventory]
+      summary: Crea o actualiza stock y precio
+      description: >-
+        Solo para rol PHARMACY. El pharmacyId se toma del JWT, nunca del body.
+        Usa upsert por (pharmacyId, productId) e incrementa version.
+      operationId: upsertInventory
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InventoryUpsertRequest'
+      responses:
+        '200':
+          description: Fila de inventario creada o actualizada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InventoryItem'
+        '400':
+          description: Datos inválidos o producto inexistente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadRequest'
+        '401':
+          description: Token ausente, inválido o expirado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Rol no permitido o cuenta sin farmacia vinculada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Error inesperado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/search:
     get:
       tags: [Search]
       summary: Comparador de precios y stock
       description: >-
         Devuelve una fila por producto y farmacia. Incluye inventario con stock
-        cero para reproducir el comportamiento del proyecto guía.
+        cero, de modo que el cliente vea qué farmacias no tienen disponibilidad.
+        La búsqueda por nombre usa un índice GIN con pg_trgm y el filtro por CP
+        usa un índice B-tree.
       operationId: searchCompare
       parameters:
         - name: q
@@ -43,6 +383,21 @@ paths:
             type: string
             enum: [price_asc, price_desc]
             default: price_asc
+        - name: limit
+          in: query
+          description: Número máximo de resultados.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: offset
+          in: query
+          description: Número de resultados a omitir.
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
       responses:
         '200':
           description: Filas comparativas por farmacia.
@@ -53,7 +408,9 @@ paths:
                 items:
                   $ref: '#/components/schemas/SearchResultRow'
         '400':
-          description: pharmacyId o categoryId no contiene un UUID válido.
+          description: >-
+            pharmacyId o categoryId no contiene un UUID válido, o limit/offset
+            no son válidos.
           content:
             application/json:
               schema:
@@ -65,10 +422,216 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Token JWT emitido por /api/auth/login o /api/auth/register.
   schemas:
+    Health:
+      type: object
+      required: [status, service]
+      properties:
+        status:
+          type: string
+          example: ok
+        service:
+          type: string
+          example: api
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          example: Invalid credentials
+    BadRequest:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          example: Invalid body
+        details:
+          type: array
+          description: >-
+            Lista de errores de validación de Zod (presente solo en errores de
+            validación del body).
+          items:
+            type: object
+            additionalProperties: true
+    UserRole:
+      type: string
+      enum: [CLIENT, PHARMACY, ADMIN]
+    PublicUser:
+      type: object
+      required: [id, email, name, role, pharmacyId]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        role:
+          $ref: '#/components/schemas/UserRole'
+        pharmacyId:
+          type: string
+          format: uuid
+          nullable: true
+    AuthResponse:
+      type: object
+      required: [token, user]
+      properties:
+        token:
+          type: string
+          description: JWT firmado con HS256.
+        user:
+          $ref: '#/components/schemas/PublicUser'
+    RegisterRequest:
+      type: object
+      required: [email, password, name, role]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        phone:
+          type: string
+          minLength: 6
+          maxLength: 30
+        role:
+          type: string
+          enum: [CLIENT, PHARMACY]
+        pharmacyId:
+          type: string
+          format: uuid
+          description: Obligatorio cuando role es PHARMACY; prohibido para CLIENT.
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 1
+    Pharmacy:
+      type: object
+      required: [id, name, address, cp, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        address:
+          type: string
+        cp:
+          type: string
+        lat:
+          type: number
+          nullable: true
+        lng:
+          type: number
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    PharmacyCreateRequest:
+      type: object
+      required: [name, address, cp]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        address:
+          type: string
+          minLength: 1
+        cp:
+          type: string
+          minLength: 1
+        lat:
+          type: number
+        lng:
+          type: number
+        phone:
+          type: string
+    Product:
+      type: object
+      required: [id, name, description, categoryId]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        categoryId:
+          type: string
+          format: uuid
+          nullable: true
+    InventoryItem:
+      type: object
+      required:
+        [id, pharmacyId, productId, stock, price, version, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        pharmacyId:
+          type: string
+          format: uuid
+        productId:
+          type: string
+          format: uuid
+        stock:
+          type: integer
+          minimum: 0
+        price:
+          type: number
+          minimum: 0
+        version:
+          type: integer
+          description: Se incrementa en cada actualización.
+        updatedAt:
+          type: string
+          format: date-time
+    InventoryUpsertRequest:
+      type: object
+      required: [productId, stock, price]
+      properties:
+        productId:
+          type: string
+          format: uuid
+        stock:
+          type: integer
+          minimum: 0
+        price:
+          type: number
+          minimum: 0
     SearchResultRow:
       type: object
-      required: [productId, productName, pharmacyId, pharmacyName, cp, stock, price, lat, lng]
+      required:
+        [productId, productName, pharmacyId, pharmacyName, cp, stock, price, lat, lng]
       properties:
         productId:
           type: string
@@ -84,6 +647,7 @@ components:
           type: string
         stock:
           type: integer
+          description: Puede ser 0; el comparador incluye productos sin existencias.
         price:
           type: number
         lat:
@@ -92,9 +656,3 @@ components:
         lng:
           type: number
           nullable: true
-    Error:
-      type: object
-      required: [error]
-      properties:
-        error:
-          type: string

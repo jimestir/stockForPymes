@@ -6,6 +6,8 @@ export interface SearchFilters {
   pharmacyId?: string;
   categoryId?: string;
   sort: SearchSort;
+  limit: number;
+  offset: number;
 }
 
 export interface SearchResultRow {
@@ -21,8 +23,9 @@ export interface SearchResultRow {
 }
 
 /**
- * Port consumed by the HTTP layer. Sprint 3 integration will provide the
- * Prisma-backed adapter over Inventory, Product and Pharmacy.
+ * Port consumed by the HTTP layer. The Prisma-backed adapter lives in
+ * `prisma-search-repository.ts` and queries Inventory joined with Product and
+ * Pharmacy.
  */
 export interface SearchRepository {
   search(filters: SearchFilters): Promise<SearchResultRow[]>;

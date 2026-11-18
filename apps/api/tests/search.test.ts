@@ -47,7 +47,9 @@ describe('GET /api/search', () => {
       cp: undefined,
       pharmacyId: undefined,
       categoryId: undefined,
-      sort: 'price_asc'
+      sort: 'price_asc',
+      limit: 20,
+      offset: 0
     });
   });
 
@@ -69,7 +71,9 @@ describe('GET /api/search', () => {
       cp: '28001',
       pharmacyId,
       categoryId,
-      sort: 'price_desc'
+      sort: 'price_desc',
+      limit: 20,
+      offset: 0
     });
   });
 
@@ -85,7 +89,9 @@ describe('GET /api/search', () => {
       cp: undefined,
       pharmacyId: undefined,
       categoryId: undefined,
-      sort: 'price_asc'
+      sort: 'price_asc',
+      limit: 20,
+      offset: 0
     });
   });
 
@@ -99,6 +105,38 @@ describe('GET /api/search', () => {
     expect(defaultSearch).toHaveBeenCalledWith(expect.objectContaining({ sort: 'price_asc' }));
     expect(invalidSearch).toHaveBeenCalledWith(expect.objectContaining({ sort: 'price_asc' }));
   });
+
+  it('forwards valid limit and offset values', async () => {
+    const search = vi.fn(async (_filters: SearchFilters) => results);
+    const response = await request(createTestApp(search))
+      .get('/api/search')
+      .query({ limit: '5', offset: '10' });
+
+    expect(response.status).toBe(200);
+    expect(search).toHaveBeenCalledWith(
+      expect.objectContaining({ limit: 5, offset: 10 })
+    );
+  });
+
+  it.each([
+    ['limit', '0', 'limit must be an integer between 1 and 100'],
+    ['limit', '101', 'limit must be an integer between 1 and 100'],
+    ['limit', 'abc', 'limit must be an integer between 1 and 100'],
+    ['offset', '-1', 'offset must be a non-negative integer'],
+    ['offset', 'abc', 'offset must be a non-negative integer']
+  ])(
+    'returns 400 for an invalid %s=%s and does not call the repository',
+    async (key, value, error) => {
+      const search = vi.fn(async (_filters: SearchFilters) => results);
+      const response = await request(createTestApp(search))
+        .get('/api/search')
+        .query({ [key]: value });
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({ error });
+      expect(search).not.toHaveBeenCalled();
+    }
+  );
 
   it.each([
     ['pharmacyId', 'not-a-uuid', 'pharmacyId must be a valid UUID'],

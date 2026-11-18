@@ -27,6 +27,7 @@ model Pharmacy {
   users     User[]
   inventory Inventory[]
 
+  @@index([cp])
   @@map("pharmacies")
 }
 
@@ -53,6 +54,8 @@ model Product {
 
   @@index([name])
   @@index([categoryId])
+  // Búsqueda ILIKE '%texto%' (pg_trgm). La extensión se crea en la migración.
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin, map: "products_name_trgm_idx")
   @@map("products")
 }
 
