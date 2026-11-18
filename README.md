@@ -192,6 +192,7 @@ Base de la API:
 | GET | `/api/products` | Catálogo de productos (filtros `q` y `categoryId`) |
 | GET | `/api/inventory` | Inventario de la farmacia autenticada (rol `PHARMACY` o `ADMIN`) |
 | PUT | `/api/inventory` | Crea o actualiza stock y precio (rol `PHARMACY`) |
+| GET | `/api/search` | Buscador comparador de precios y stock (filtros `q`, `cp`, `pharmacyId`, `categoryId`, `sort`, `limit`, `offset`) |
 
 ### Autenticación
 
@@ -280,6 +281,50 @@ Campos opcionales:
 
 Si la creación se realiza correctamente, la API devuelve el código HTTP `201 Created` junto con los datos de la farmacia registrada.
 
+### Buscador y comparador de precios
+
+`GET /api/search` devuelve una fila por producto y farmacia, uniendo el
+inventario con el producto y la farmacia. Es un endpoint público.
+
+Parámetros de consulta:
+
+| Parámetro | Descripción |
+|---|---|
+| `q` | Texto a buscar en el nombre del producto (sin distinguir mayúsculas). |
+| `cp` | Código postal de la farmacia. |
+| `pharmacyId` | UUID de una farmacia concreta. |
+| `categoryId` | UUID de una categoría. |
+| `sort` | `price_asc` (por defecto) o `price_desc`. |
+| `limit` | Número de resultados, entre 1 y 100 (por defecto 20). |
+| `offset` | Número de resultados a omitir (por defecto 0). |
+
+Ejemplo:
+
+```bash
+curl "http://localhost:3000/api/search?q=paracetamol&cp=28001&sort=price_asc&limit=10"
+```
+
+Respuesta:
+
+```json
+[
+  {
+    "productId": "33333333-3333-4333-8333-333333333333",
+    "productName": "Paracetamol 500 mg",
+    "pharmacyId": "11111111-1111-4111-8111-111111111111",
+    "pharmacyName": "Farmacia Central",
+    "cp": "28001",
+    "stock": 40,
+    "price": 4.95,
+    "lat": 40.4168,
+    "lng": -3.7038
+  }
+]
+```
+
+Los productos con stock cero también aparecen en el comparador, para que el
+cliente vea que esa farmacia no tiene disponibilidad.
+
 ## Estrategia de pruebas
 
 La estrategia de pruebas tiene como objetivo comprobar el correcto funcionamiento de la API, validar los datos recibidos y verificar la comunicación con la base de datos PostgreSQL.
@@ -297,6 +342,26 @@ Se aplicarán principalmente a las operaciones de consulta y registro de farmaci
 Permiten verificar la comunicación entre los distintos componentes del sistema, especialmente entre Express, Prisma y PostgreSQL.
 
 Se utilizarán para comprobar que las peticiones realizadas a la API producen los resultados esperados en la base de datos.
+
+### Pruebas automatizadas (Vitest + Supertest)
+
+El API incluye pruebas automatizadas con **Vitest** y **Supertest**. Desde la
+raíz del monorepo:
+
+```bash
+npm test
+```
+
+Para ejecutarlas en modo watch desde `apps/api`:
+
+```bash
+npm run test:watch -w @stock-pymes/api
+```
+
+Las pruebas cubren el contrato HTTP del buscador (filtros, orden, paginación,
+UUID inválidos y errores), el montaje real de la ruta en la aplicación y el
+mapeo del adaptador Prisma. No necesitan una base de datos levantada porque el
+adaptador se prueba con el cliente Prisma simulado.
 
 ## Tipos de pruebas previstos
 
@@ -351,6 +416,7 @@ En la raíz del monorepo:
 | Script | Descripción |
 |---|---|
 | `npm run dev:api` | Ejecuta la API en modo desarrollo (watch). |
+| `npm test` | Ejecuta las pruebas automatizadas del API con Vitest. |
 | `npm run db:up` | Levanta PostgreSQL con Docker Compose. |
 | `npm run db:down` | Detiene los servicios de Docker Compose. |
 | `npm run db:logs` | Muestra los registros de PostgreSQL. |
@@ -365,7 +431,9 @@ En `apps/api`:
 | `npm run dev` | Ejecuta la API en desarrollo con recarga automática. |
 | `npm run build` | Compila TypeScript a `dist/`. |
 | `npm start` | Ejecuta la versión compilada. |
-| `npm run typecheck` | Comprueba los tipos sin generar archivos. |
+| `npm run typecheck` | Comprueba los tipos del código y de las pruebas sin generar archivos. |
+| `npm test` | Ejecuta las pruebas con Vitest. |
+| `npm run test:watch` | Ejecuta las pruebas en modo watch. |
 | `npm run clean` | Elimina la carpeta `dist/`. |
 | `npm run db:seed` | Carga los datos de demo. |
 

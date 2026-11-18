@@ -5,10 +5,17 @@ import { authRouter } from './routes/auth.js';
 import { inventoryRouter } from './routes/inventory.js';
 import { pharmaciesRouter } from './routes/pharmacies.js';
 import { productsRouter } from './routes/products.js';
+import { createSearchRouter } from './routes/search.js';
+import { prismaSearchRepository } from './search/prisma-search-repository.js';
+import type { SearchRepository } from './search/types.js';
 import type { NextFunction, Request, Response } from 'express';
 import { env } from './config/env.js';
 
-export function createApp() {
+export interface AppDependencies {
+  searchRepository?: SearchRepository;
+}
+
+export function createApp(dependencies: AppDependencies = {}) {
   const app = express();
 
   app.use(helmet());
@@ -30,6 +37,10 @@ export function createApp() {
   app.use('/api/products', productsRouter);
   app.use('/api/inventory', inventoryRouter);
   app.use('/api/auth', authRouter);
+  app.use(
+    '/api/search',
+    createSearchRouter(dependencies.searchRepository ?? prismaSearchRepository)
+  );
   app.use((_req, res) => {
     res.status(404).json({ error: 'Not found' });
   });

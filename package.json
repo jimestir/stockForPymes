@@ -8,6 +8,7 @@
   ],
   "scripts": {
     "dev:api": "npm run dev -w @stock-pymes/api",
+    "test": "npm test -w @stock-pymes/api",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
     "db:logs": "docker compose logs -f postgres",

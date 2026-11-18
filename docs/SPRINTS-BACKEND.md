@@ -7,8 +7,9 @@ base de datos y después la API que la usa.
 
 - **Sprint 0 — Fundaciones** ✅ (monorepo, Express, health, Docker/PostgreSQL, Prisma, config)
 - **Sprint 1 — Modelo de datos** ✅ (schema completo, migración `init`, cliente)
-- **Sprint 2 — Autenticación** ✅ (rama `feature/auth-jwt`, pendiente de merge)
-- **Sprint 3 — Catálogo e inventario** ✅ (rama `feat/inventory-and-catalog`)
+- **Sprint 2 — Autenticación** ✅ (integrado en `develop`)
+- **Sprint 3 — Catálogo e inventario** ✅ (integrado en `develop`)
+- **Sprint 4 — Buscador / comparador** ✅ (rama `feature/searchandpurchase`)
 
 ---
 
@@ -65,15 +66,32 @@ farmacia no ve ni escribe el inventario de otra, `stock: -1` da `400` por Zod y
 
 ---
 
-## Sprint 4 — Buscador / comparador
+## Sprint 4 — Buscador / comparador ✅
 
-**Base de datos:** sin tablas nuevas. Aquí se explotan los **índices** (`products.name`, `pharmacies.cp`, `inventory(pharmacyId)`) y el `@@unique([pharmacyId, productId])`.
+**Base de datos:** sin tablas nuevas. Se explotan los índices existentes
+(`products.categoryId`, `inventory(pharmacyId)` y `@@unique([pharmacyId, productId])`)
+y se añaden dos índices nuevos:
+
+- `pharmacies.cp` (B-tree) para el filtro por código postal
+  (migración `20261109230000_add_pharmacy_cp_index`).
+- `products.name` con **GIN + `pg_trgm`** para acelerar búsquedas
+  `ILIKE '%texto%'` (migración `20261109233000_add_product_name_trgm_index`).
 
 **API:**
-- `GET /api/search?q=&cp=&pharmacyId=&categoryId=&sort=price_asc|price_desc`
-- JOIN `Inventory → Product/Pharmacy`, orden por precio, stock > 0
+- `GET /api/search?q=&cp=&pharmacyId=&categoryId=&sort=price_asc|price_desc&limit=&offset=`
+  - JOIN `Inventory → Product/Pharmacy`, orden por precio.
+  - Incluye productos con `stock = 0` (`stock >= 0`), para que el cliente vea
+    que esa farmacia no tiene disponibilidad.
+  - `limit` entre 1 y 100 (por defecto 20) y `offset` >= 0 (por defecto 0).
+  - Validación de UUID para `pharmacyId` y `categoryId`; 400 si son inválidos.
+- Adaptador Prisma en `src/search/prisma-search-repository.ts`, separado del
+  router mediante el puerto `SearchRepository`.
+- Pruebas con Vitest + Supertest: contrato HTTP, montaje real de la ruta en la
+  app y mapeo del adaptador (18 pruebas en total).
 
-**Criterio de hecho:** devuelve filas comparativas por farmacia y responde rápido con índices.
+**Criterio de hecho:** ✅ verificado — devuelve filas comparativas por farmacia,
+ordena por precio, pagina resultados y usa índices para `cp` y búsqueda por
+texto (`pg_trgm`).
 
 ---
 
@@ -144,7 +162,7 @@ farmacia no ve ni escribe el inventario de otra, `stock: -1` da `400` por Zod y
 
 ## Recomendación inmediata
 
-**Sprint 2 cerrado** ✅ (auth, rutas protegidas y rate limiting). Tras el merge a
-`develop`, empezar el **Sprint 3**. Antes de implementarlo, hacer una **migración
-pequeña** que resuelva `ean` + los `CHECK`. Así cada sprint entra con su base de
-datos ya lista.
+**Sprints 2, 3 y 4 cerrados** ✅. Tras el merge de `feature/searchandpurchase` a
+`develop`, empezar el **Sprint 5 — Reservas y concurrencia**. Antes de
+implementarlo, cerrar las decisiones pendientes (TTL de reservas, `Product.ean`
+y aprobación de farmacias).
