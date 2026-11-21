@@ -12,6 +12,7 @@
     "test:watch": "vitest",
     "db:admin": "tsx prisma/seed-admin.ts",
     "db:seed": "tsx prisma/seed.ts",
+    "prisma:deploy": "prisma migrate deploy",
     "postinstall": "prisma skills sync || exit 0"
   },
   "keywords": [],
